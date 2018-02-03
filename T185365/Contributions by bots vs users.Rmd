@@ -1,0 +1,200 @@
+---
+title: "Wikimedia Commons: File Contributions by Bots vs Users (Redux)"
+author: "Megan Neisler"
+date: "1/30/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(0)
+library(tidyverse)
+```
+
+
+```{r}
+message("Create an auto-closing SSH tunnel in the backgroud")
+system("ssh -f -o ExitOnForwardFailure=yes stat1006.eqiad.wmnet -L 3307:analytics-store.eqiad.wmnet:3306 sleep 10")
+library(RMySQL)
+con <- dbConnect(MySQL(), host = "127.0.0.1", group = "client", dbname = "commonswiki", port = 3307)
+```
+
+Epic Ticket: [T185363] (https://phabricator.wikimedia.org/T185363)
+
+# Baseline Metrics for SDoC: Reviewing File Contributions by Bots vs Users.#
+
+This is a replicate of Chelsy's analysis from October 2017, comparing file contributions by bots and users to Wikimedia Commons.
+
+On February 1, 2018, I queried the image table of the Wikimedia Commons database to find the number of files uploaded by users and bots. The query identified user accounts identfied as being in the bot group in user_groups table or user_former_groups table, and user accounts that belong to categories whose name match _(bot_flag|bots)(_|$), as bot accounts. I then broke these file counts down by media type (defined by img_media_type field in image table).  In addition, I reviewed the total number of file contributions each month (non-cumulative) and cumulative.
+
+[To be updated with new results]
+The number of files uploaded by bots is 9,390,408 (22.04%), and the number of files uploaded by users is 33,222,838 (77.96%).At the end of September, 9270420 (21.89%) files are uploaded by bot, and 33081547 (78.11%) are by user. At the end of August, the number is 9120168 (21.92%) vs 32483351 (78.08%).
+
+
+Ticket: [T185365] (https://phabricator.wikimedia.org/T185365)
+
+
+### File Contributions by Media Type ###
+
+```{r}
+# Create query to count the number of bot and user contributions by media type.
+query <- "
+SELECT img_media_type, user_group, COUNT(*) AS n_files
+FROM (
+-- Get active bots
+SELECT ug_user AS user_id, ug_group AS user_group
+FROM user_groups
+WHERE ug_group = 'bot'
+-- Get inactive bots
+UNION
+SELECT ufg_user AS user_id, ufg_group AS user_group
+FROM user_former_groups
+WHERE ufg_group = 'bot'
+UNION
+-- Get user ids with bot categories in their user pages
+SELECT user.user_id, 'bot' AS user_group
+FROM user INNER JOIN (
+  -- select all user page names with bot category
+  SELECT REPLACE(page.page_title, '_', ' ') AS user_name
+  FROM page INNER JOIN (
+    -- select page ids with bot categories 
+    SELECT DISTINCT cl_from AS page_id
+    FROM categorylinks
+    WHERE cl_to REGEXP '_(bot_flag|bots)(_|$)'
+      AND cl_type = 'page'
+  ) AS bot_cat ON page.page_id=bot_cat.page_id
+  WHERE page_namespace = 2
+) AS bot_name ON user.user_name=bot_name.user_name
+) AS bots RIGHT JOIN image ON bots.user_id = image.img_user
+GROUP BY img_media_type, user_group;
+"
+```
+
+
+```{r}
+
+message("Using SSH tunnel & connection to Analytics-Store...")
+bot_by_mediatype <- wmf::mysql_read(query, "commonswiki", con = con)
+message("Closing connection...")
+wmf::mysql_close(con)
+save(bot_by_mediatype, file = "data/bot_by_mediatype.RData")
+```
+
+```{r}
+load("data/bot_by_mediatype.Rdata")
+#clean up table and add proportion columns
+bot_by_mediatype <- bot_by_mediatype %>%
+        mutate(user_group = if_else(is.na(user_group), "user", user_group),
+               img_media_type = tolower(img_media_type),
+               proportion = paste0(round(n_files/ sum(n_files), 4)*100, "%"))
+#calculation proportion by user group
+bot_by_mediatype %>%
+        group_by(user_group) %>%
+        mutate(proportion = n_files/sum(n_files))
+
+
+#format table
+knitr::kable(bot_by_mediatype)
+```
+
+
+## Cumulative File Contributions By Month ##
+```{r}
+# Create query to count the number of bot and user contributions by month.
+query <- "
+SELECT LEFT(img_timestamp, 6) AS yr_month, user_group, COUNT(*) AS n_files
+FROM (
+-- Get active bots
+SELECT ug_user AS user_id, ug_group AS user_group
+FROM user_groups
+WHERE ug_group = 'bot'
+UNION
+-- Get inactive bots
+SELECT ufg_user AS user_id, ufg_group AS user_group
+FROM user_former_groups
+WHERE ufg_group = 'bot'
+UNION
+-- Get user ids with bot categories in their user pages
+SELECT user.user_id, 'bot' AS user_group
+FROM user INNER JOIN (
+  -- all user page names with bot category
+  SELECT REPLACE(page.page_title, '_', ' ') AS user_name
+  FROM page INNER JOIN (
+    -- page ids with bot categories 
+    SELECT DISTINCT cl_from AS page_id
+    FROM categorylinks
+    WHERE cl_to REGEXP '_(bot_flag|bots)(_|$)'
+      AND cl_type = 'page'
+  ) AS bot_cat ON page.page_id=bot_cat.page_id
+  WHERE page_namespace = 2
+) AS bot_name ON user.user_name=bot_name.user_name
+) AS bots RIGHT JOIN image ON bots.user_id = image.img_user
+GROUP BY LEFT(img_timestamp, 6), user_group;
+"
+```
+
+```{r}
+message("Using SSH tunnel & connection to Analytics-Store...")
+bot_by_month <- wmf::mysql_read(query, "commonswiki", con = con)
+message("Closing connection...")
+wmf::mysql_close(con)
+save(bot_by_month, file = "data/bot_by_month.RData")
+```
+
+```{r}
+load("data/bot_by_month.RData")
+
+bot_by_month <- bot_by_month %>%
+  mutate(year_month = zoo::as.yearmon(yr_month, "%Y%m"),
+         user_group = if_else(is.na(user_group), "user", user_group)) %>%
+  arrange(year_month, user_group) %>%
+  group_by(user_group) %>%
+  mutate(total_files = cumsum(n_files)) %>%
+  group_by(yr_month) %>%
+  mutate(proportion = total_files / sum(total_files))
+
+```
+
+```{r}
+library("polloi")
+bot_by_month %>%
+  ggplot(aes(x=year_month, y=total_files, group=user_group, color=user_group)) +
+  geom_line(size = 1) +
+  zoo::scale_x_yearmon(breaks = seq(min(bot_by_month$year_month), max(bot_by_month$year_month), by = 1)) +
+  scale_y_continuous(labels = polloi::compress) +
+  scale_color_brewer("User Group", palette = "Set2") +
+  labs(x = "Month", y = "Number of files", title = "File contributions on Wikimedia Commons by users and bots") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom", strip.placement = "outside", axis.text.x = element_text(angle = 90))
+```
+
+
+```{r}
+bot_by_month %>%
+  ggplot(aes(x=year_month, y=proportion, group=user_group, fill=user_group)) +
+  geom_bar(stat = 'identity', position = 'dodge', alpha = 2/3) +
+  zoo::scale_x_yearmon(breaks = seq(min(bot_by_month$year_month), max(bot_by_month$year_month), by = 1)) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_color_brewer("User Group", palette = "Set1") +
+  labs(x = "Month", y = "Proportion of files", title = "Proportion of files contributions on Wikimedia Commons by bots and users") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom", strip.placement = "outside", axis.text.x = element_text(angle = 90))
+```
+
+## Contributions Overall ##
+
+```{r}
+#find cumulative sum for bots and users.
+users_bots_total <- bot_by_month %>%
+        group_by(user_group) %>%
+        transmute(total_files = sum(n_files),
+                  proportion = total_files / sum(total_files)) %>%
+        unique()
+
+#format table
+knitr::kable(users_bots_total)
+```
+
+
+
+
