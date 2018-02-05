@@ -40,7 +40,6 @@ Ticket: [T185365](https://phabricator.wikimedia.org/T185365)
 ## File contributions by media type 
 
 ```{r}
-# Create query to count the number of bot and user contributions by media type.
 query <- "
 SELECT img_media_type, user_group, COUNT(*) AS n_files
 FROM (
@@ -83,6 +82,7 @@ wmf::mysql_close(con)
 save(bot_by_mediatype, file = "data/bot_by_mediatype.RData")
 ```
 
+### File contributions by all media types
 ```{r}
 load("data/bot_by_mediatype.Rdata")
 
@@ -101,11 +101,11 @@ bot_by_mediatype %>%
 knitr::kable(bot_by_mediatype)
 ```
 
-
+### File contributions by non-bitmap media types
 ```{r}
 bot_by_mediatype_omitbitmap <- bot_by_mediatype[bot_by_mediatype$img_media_type != "bitmap",]
 
-media_type_plot <- bot_by_mediatype_omitbitmap %>%
+bot_by_mediatype_omitbitmap %>%
   ggplot(aes(x=img_media_type, y=n_files, group=user_group, fill=user_group)) +
   geom_col(position = "dodge") +
   scale_color_brewer("User Group", palette = "Set1") +
@@ -113,14 +113,11 @@ media_type_plot <- bot_by_mediatype_omitbitmap %>%
   theme_minimal(base_size = 11) +
    theme(legend.position = "bottom", strip.placement = "outside", axis.text.x = element_text(angle = 90))
 
-ggsave("bot_by_mediatype_omitbitmap.png", plot = media_type_plot)
-media_type_plot
 ```
 
 
 ## File contributions by month 
 ```{r}
-# Create query to count the number of bot and user contributions by month.
 query <- "
 SELECT LEFT(img_timestamp, 6) AS yr_month, user_group, COUNT(*) AS n_files
 FROM (
@@ -204,7 +201,7 @@ bot_by_month %>%
 
 ```
 
-### Total number of newly uploaded (non-Cumulative) file contributions by month
+### Newly uploaded (non-cumulative) file contributions by month
 ```{r}
 bot_by_month %>%
   ggplot(aes(x=year_month, y=n_files, group=user_group, color=user_group)) +
