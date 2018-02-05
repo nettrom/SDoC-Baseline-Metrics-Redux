@@ -23,7 +23,7 @@ As shown in the table below, bitmaps are the most common media type files upload
 
 *Some bots are operated by institution, and some are tools like [Flickr upload bot](https://commons.wikimedia.org/wiki/User:Flickr_upload_bot).
 
-The following graphs show the total number of file contributions each month, both cumulative and non-cumulative..
+The following graphs show the total number of file contributions each month, both cumulative and non-cumulative.
 
 ![Cumulative sum of file contributions on Commons by user groups](figures/bot_by_month_cumsum.png)
 
