@@ -1,8 +1,10 @@
 ---
-title: "Wikimedia Commons: File Contributions by Bots vs Users (Redux)"
+title: 'Wikimedia Commons: File Contributions by Bots and Users (Redux)'
 author: "Megan Neisler"
 date: "1/30/2018"
-output: html_document
+output:
+  html_document: default
+  'html_document: default': default
 ---
 
 ```{r setup, include=FALSE}
@@ -19,22 +21,23 @@ library(RMySQL)
 con <- dbConnect(MySQL(), host = "127.0.0.1", group = "client", dbname = "commonswiki", port = 3307)
 ```
 
-Epic Ticket: [T185363] (https://phabricator.wikimedia.org/T185363)
+Epic Ticket: [T185363](https://phabricator.wikimedia.org/T185363)
 
-# Baseline Metrics for SDoC: Reviewing File Contributions by Bots vs Users.#
+# Baseline Metrics for SDoC: Reviewing File Contributions by Bots and Users 
 
-This is a replicate of Chelsy's analysis from October 2017, comparing file contributions by bots and users to Wikimedia Commons.
+This is a replicate of Chelsy's report from October 12, 2017, comparing file contributions by bots and users to Wikimedia Commons from lanunch of Commons, September 2004, to the end of January 2018.
 
-On February 1, 2018, I queried the image table of the Wikimedia Commons database to find the number of files uploaded by users and bots. The query identified user accounts identfied as being in the bot group in user_groups table or user_former_groups table, and user accounts that belong to categories whose name match _(bot_flag|bots)(_|$), as bot accounts. I then broke these file counts down by media type (defined by img_media_type field in image table).  In addition, I reviewed the total number of file contributions each month (non-cumulative) and cumulative.
+On February 1, 2018, I queried the image table of the Wikimedia Commons database to find the number of files uploaded by users and bots (tools or operated by institutions. The query identified user accounts identfied as being in the bot group in user_groups table or user_former_groups table, and user accounts that belong to categories whose name match _(bot_flag|bots)(_|$), as bot accounts. I then broke these file counts down by media type (defined by img_media_type field in image table).  In addition, I reviewed the total number of file contributions each month including the cumulative sum of file uploads and files newly uploaded each month (non-cumulative).
 
-[To be updated with new results]
-The number of files uploaded by bots is 9,390,408 (22.04%), and the number of files uploaded by users is 33,222,838 (77.96%).At the end of September, 9270420 (21.89%) files are uploaded by bot, and 33081547 (78.11%) are by user. At the end of August, the number is 9120168 (21.92%) vs 32483351 (78.08%).
+The total number of files uploaded by bots is 9,418,169 (22.04%), and the number of files uploaded by users is 35,180,917 (77.96%). In just the month of January 2018, 10,066 new files were uploaded by bots and 653,997 new files were uploaded by users. This is an increase from the month of December 2017 where 7,831 new files were uploaded by bots and 498,542 new files were uploaded by users. 
 
-
-Ticket: [T185365] (https://phabricator.wikimedia.org/T185365)
+Bitmaps are the most common media type files uploaded by both bots and users, comprising 94.30% of all media contributions to Wikimedia Commons.   
 
 
-### File Contributions by Media Type ###
+Ticket: [T185365](https://phabricator.wikimedia.org/T185365)
+
+
+## File contributions by media type 
 
 ```{r}
 # Create query to count the number of bot and user contributions by media type.
@@ -82,23 +85,40 @@ save(bot_by_mediatype, file = "data/bot_by_mediatype.RData")
 
 ```{r}
 load("data/bot_by_mediatype.Rdata")
-#clean up table and add proportion columns
+
 bot_by_mediatype <- bot_by_mediatype %>%
         mutate(user_group = if_else(is.na(user_group), "user", user_group),
                img_media_type = tolower(img_media_type),
-               proportion = paste0(round(n_files/ sum(n_files), 4)*100, "%"))
-#calculation proportion by user group
+               proportion = paste0(round(n_files/sum(n_files), 4)*100, "%"))
+
+
 bot_by_mediatype %>%
         group_by(user_group) %>%
+        summarize(n_files = sum(n_files)) %>%
         mutate(proportion = n_files/sum(n_files))
 
 
-#format table
 knitr::kable(bot_by_mediatype)
 ```
 
 
-## Cumulative File Contributions By Month ##
+```{r}
+bot_by_mediatype_omitbitmap <- bot_by_mediatype[bot_by_mediatype$img_media_type != "bitmap",]
+
+media_type_plot <- bot_by_mediatype_omitbitmap %>%
+  ggplot(aes(x=img_media_type, y=n_files, group=user_group, fill=user_group)) +
+  geom_col(position = "dodge") +
+  scale_color_brewer("User Group", palette = "Set1") +
+  labs(x = "Media type", y = "No. of files", title = "File contributions on Wikimedia Commons by non-bitmap media types") +
+  theme_minimal(base_size = 11) +
+   theme(legend.position = "bottom", strip.placement = "outside", axis.text.x = element_text(angle = 90))
+
+ggsave("bot_by_mediatype_omitbitmap.png", plot = media_type_plot)
+media_type_plot
+```
+
+
+## File contributions by month 
 ```{r}
 # Create query to count the number of bot and user contributions by month.
 query <- "
@@ -152,9 +172,9 @@ bot_by_month <- bot_by_month %>%
   mutate(total_files = cumsum(n_files)) %>%
   group_by(yr_month) %>%
   mutate(proportion = total_files / sum(total_files))
-
 ```
 
+### Cumulative sum of file contributions by month 
 ```{r}
 library("polloi")
 bot_by_month %>%
@@ -163,38 +183,39 @@ bot_by_month %>%
   zoo::scale_x_yearmon(breaks = seq(min(bot_by_month$year_month), max(bot_by_month$year_month), by = 1)) +
   scale_y_continuous(labels = polloi::compress) +
   scale_color_brewer("User Group", palette = "Set2") +
-  labs(x = "Month", y = "Number of files", title = "File contributions on Wikimedia Commons by users and bots") +
-  theme_minimal(base_size = 12) +
+  labs(x = "Month", y = "Cumulative sum of files", title = "Cumulative sum of file contributions on Wikimedia Commons by users and bots") +
+  theme_minimal(base_size = 11) +
   theme(legend.position = "bottom", strip.placement = "outside", axis.text.x = element_text(angle = 90))
+
 ```
 
 
+
 ```{r}
-bot_by_month %>%
-  ggplot(aes(x=year_month, y=proportion, group=user_group, fill=user_group)) +
-  geom_bar(stat = 'identity', position = 'dodge', alpha = 2/3) +
+ monthplot <- bot_by_month %>%
+  ggplot(aes(x=year_month, y=proportion, group=user_group, color=user_group)) +
+  geom_line(size = 1) +
   zoo::scale_x_yearmon(breaks = seq(min(bot_by_month$year_month), max(bot_by_month$year_month), by = 1)) +
   scale_y_continuous(labels = scales::percent) +
-  scale_color_brewer("User Group", palette = "Set1") +
-  labs(x = "Month", y = "Proportion of files", title = "Proportion of files contributions on Wikimedia Commons by bots and users") +
-  theme_minimal(base_size = 12) +
+  scale_color_brewer("User Group", palette = "Set2") +
+  labs(x = "Month", y = "Proportion of files (Cumulative)", title = "Proportion of files contributions on Wikimedia Commons by bots and users") +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom", strip.placement = "outside", axis.text.x = element_text(angle = 90))
+
+```
+
+### Total number of newly uploaded (non-Cumulative) file contributions by month
+```{r}
+bot_by_month %>%
+  ggplot(aes(x=year_month, y=n_files, group=user_group, color=user_group)) +
+  geom_line(size = 1) +
+  zoo::scale_x_yearmon(breaks = seq(min(bot_by_month$year_month), max(bot_by_month$year_month), by = 1)) +
+  scale_y_continuous(labels = polloi::compress) +
+  scale_color_brewer("User Group", palette = "Set2") +
+  labs(x = "Month", y = "Number of new files", title = "Total number of newly uploaded files on Wikimedia Commons by users and bots") +
+  theme_minimal(base_size = 10) +
   theme(legend.position = "bottom", strip.placement = "outside", axis.text.x = element_text(angle = 90))
 ```
-
-## Contributions Overall ##
-
-```{r}
-#find cumulative sum for bots and users.
-users_bots_total <- bot_by_month %>%
-        group_by(user_group) %>%
-        transmute(total_files = sum(n_files),
-                  proportion = total_files / sum(total_files)) %>%
-        unique()
-
-#format table
-knitr::kable(users_bots_total)
-```
-
 
 
 
