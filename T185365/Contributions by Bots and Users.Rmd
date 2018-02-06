@@ -216,6 +216,6 @@ bot_by_month %>%
   theme(legend.position = "bottom", strip.placement = "outside", axis.text.x = element_text(angle = 90))
 ```
 
-Note: The plot above show the total number of new file contributions to Commons each month but does not account for deleted files 
+Note: The plot above show the total number of new file contributions to Commons each month but does not yet account for deleted files.
 
 
