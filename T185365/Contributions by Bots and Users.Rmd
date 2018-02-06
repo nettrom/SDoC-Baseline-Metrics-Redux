@@ -189,7 +189,7 @@ bot_by_month %>%
 
 
 ```{r}
- monthplot <- bot_by_month %>%
+bot_by_month %>%
   ggplot(aes(x=year_month, y=proportion, group=user_group, color=user_group)) +
   geom_line(size = 1) +
   zoo::scale_x_yearmon(breaks = seq(min(bot_by_month$year_month), max(bot_by_month$year_month), by = 1)) +
@@ -203,8 +203,10 @@ bot_by_month %>%
 
 ### Newly uploaded (non-cumulative) file contributions by month
 ```{r}
-bot_by_month %>%
-  ggplot(aes(x=year_month, y=n_files, group=user_group, color=user_group)) +
+ bot_by_month %>% 
+        filter(yr_month != 201802) %>% 
+#filter out last month since query was run at the beginning of February.
+ ggplot(aes(x=year_month, y=n_files, group=user_group, color=user_group)) +
   geom_line(size = 1) +
   zoo::scale_x_yearmon(breaks = seq(min(bot_by_month$year_month), max(bot_by_month$year_month), by = 1)) +
   scale_y_continuous(labels = polloi::compress) +
@@ -214,5 +216,6 @@ bot_by_month %>%
   theme(legend.position = "bottom", strip.placement = "outside", axis.text.x = element_text(angle = 90))
 ```
 
+Note: The plot above show the total number of new file contributions to Commons each month but does not account for deleted files 
 
 
