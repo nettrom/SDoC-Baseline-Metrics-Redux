@@ -2,6 +2,15 @@
 
 This is a replicate of Mikhail's report from October 2017, [T177356](https://phabricator.wikimedia.org/T177356), reviewing several metrics related to file types and deletion behaviors using filearchive and image table in commonswiki database. This analysis incudes data collected from the launch of Commons in September 2004 to the end of January 2018.
 
+## Questions Reviewed
+
+1. The distribution of file types and extensions. 
+2. Cumulative upload counts and newly uploads per month by file extension. 
+3. The proportion of files got deleted within a month after uploaded. How does this deletion rate look like over time?
+4. Number of deleters (users who have deleted at least one file) over time.
+5. How many files each user has deleted?
+6. Time to deletion, broken up by file type and reason for deletion (copyright violation vs other)
+
 ## Distribution of file types
 
 I queried the image table of the commons wiki to select the img_timestamp and file extension type (jpeg, gif, png, etc). The file name was used to determine the format of the file as the "img_minor_mime" and "img_media_type" fields may not be accurately labeled for all files. Note these metrics do not include files that were deleted as of 2018-02-11. 
@@ -55,7 +64,7 @@ As indicated in the Oct 2017 report, most copyright-related deletions happen wit
 ![](file_deletion_time/figures/time-to-deletion.png)
 
 
-I aslo reviewed the proportion of files deleted under month after uploaded. About 53% of all the deleted files were deleted within one month of the upload date. Most video, audio, and office type files are deleted within 1 month after they are uploaded. Most newly uploaded files in the month of January 2011 (that were eventually deleted) were deleted within the same month. 
+I aslo reviewed the proportion of files deleted under month after uploaded. About 53% of all the deleted files were deleted within one month of the upload date. Most video, audio, and office type files are deleted within 1 month after they are uploaded. After 2012, more deleted files are deleted within 1 month of their upload date while before 2012 more deleted files were deleted after 1 month of their upload date. 
 
 ![](file_deletion_time/figures/monthly_uploads_deletions.png)
 
