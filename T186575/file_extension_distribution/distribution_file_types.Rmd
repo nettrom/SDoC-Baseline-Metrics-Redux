@@ -1,0 +1,220 @@
+---
+title: "Distribution of file type and trends on Wikimedia Commons (Redux)""
+author: "MNeisler"
+date: "2/6/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(0)
+library(tidyverse)
+```
+
+
+```{r}
+message("Create an auto-closing SSH tunnel in the background")
+system("ssh -f -o ExitOnForwardFailure=yes stat1006.eqiad.wmnet -L 3307:analytics-store.eqiad.wmnet:3306 sleep 10")
+library(RMySQL)
+con <- dbConnect(MySQL(), host = "127.0.0.1", group = "client", dbname = "commonswiki", port = 3307)
+```
+
+Epic Ticket: [T185363](https://phabricator.wikimedia.org/T185363)
+
+## Distribution of file types and trends on Wikimedia Commons
+
+This report is a replicate of Mikhail's report in October 2017, reviewing the distribution of file types and extensions. I also reviewed the the cumulative upload counts and newly uploads per month by file extension. 
+
+Questions addressed:
+1. The distribution of file types and extensions. 
+
+2. Cumulative upload counts and newly uploads per month by file extension.
+
+For the purpose of this analysis, I defined "newly uploaded" as files that were added and not deleted from upload until today. 
+
+Ticket: [T18675](https://phabricator.wikimedia.org/T186575)
+
+
+### File type table
+I first queried the image table of the commons wiki to select the img_timestamp and file extension type (jpeg, gif, png, etc). The file name was used to determine the format of the file as the "img_minor_mime" and "img_media_type" fields may not be accurately labeled for all files. 
+
+```{r}
+query <- "SELECT
+  DATE(LEFT(img_timestamp, 8)) AS `date`,
+  SUBSTRING(REGEXP_SUBSTR(LOWER(CONVERT(img_name USING utf8)), '\\\\.([a-z]{3,})$'), 2, 10) AS extension,
+  COUNT(*) AS uploads
+FROM image
+GROUP BY `date`, extension;"
+```
+
+```{r}
+message("Using SSH tunnel & connection to Analytics-Store...")
+uploads_by_filetype <- wmf::mysql_read(query, "commonswiki", con)
+message("Closing connection...")
+wmf::mysql_close(con)
+save(uploads_by_filetype, file = "data/uploads_by_filetype.RData")
+```
+
+```{r}
+load("data/uploads_by_filetype.Rdata")
+#Convert date to y-m-d format
+library(magrittr)
+library(lubridate)
+uploads_by_filetype$date %<>% ymd()
+#remove empty extension fields.
+uploads_by_filetype <- uploads_by_filetype[uploads_by_filetype$extension != "", ]
+```
+
+
+```{r}
+#rename extension files to group jpg/jpeg and tif/tiff files together.
+uploads_by_filetype %<>%
+  mutate(extension = case_when(
+    extension %in% c("jpg", "jpeg") ~ "jpg/jpeg",
+    extension %in% c("tif", "tiff") ~ "tif/tiff",
+    TRUE ~ extension
+  ))
+```
+
+### Find the cumulative file uploads by month and file type
+```{r}
+#Sum of uploads by file extension type. 
+total_uploads <- uploads_by_filetype %>%
+        group_by(extension) %>%
+        summarize(uploads = sum(uploads)) %>%
+        arrange(desc(uploads))
+```
+
+```{r}
+# Find cumulative uploads column broken down by extension and month. 
+cumulative_uploads <- 
+        uploads_by_filetype %>%
+        group_by(extension) %>%
+        arrange(date) %>%
+        mutate(cumulative_uploads = cumsum(uploads)) %>%
+        ungroup() %>%
+        mutate(extension = factor(extension,
+                                  total_uploads$extension))
+```
+
+
+```{r}
+library(ggplot2)
+p <- ggplot(filter(cumulative_uploads, date < "2018-02-01"), aes(x = date, y = cumulative_uploads)) +
+  geom_line() +
+  scale_y_continuous("Cumulative files uploaded", labels = polloi::compress) +
+  scale_x_date("Date", date_breaks = "2 years", date_minor_breaks = "1 year", date_labels = "'%y") +
+  facet_wrap(~ extension, scales = "free_y") +
+  wmf::theme_facet(14) +
+  labs(
+    title = "Wikimedia Commons cumulative upload counts by file extension type",
+    subtitle = "Does not include files that have been deleted as of 2018-02-11"
+  )
+
+p 
+ggsave("figures/cumulative_uploads.png", p, width = 18, height = 9, units = "in", dpi = 150)
+```
+
+### Find the monthly file uploads by month and file type
+```{r}
+monthly_uploads <- uploads_by_filetype %>%
+        mutate(month = floor_date(date, "months")) %>% #round down to months
+        group_by(month, extension) %>%
+        summarize(monthly_uploads = sum(uploads)) %>%
+        ungroup()
+
+head(monthly_uploads)
+```
+```{r}
+#Find the top monthly uploads for each file type. 
+top_upload_months <- monthly_uploads %>%
+        filter(month < "2018-02-01") %>%
+        group_by(extension) %>%
+        top_n(1, monthly_uploads)
+
+```
+
+
+```{r}
+p <- ggplot(filter(monthly_uploads, month < "2018-02-01"), 
+            aes(x = month, y = monthly_uploads)) +
+        geom_line() +
+        geom_point(data = top_upload_months) +
+        geom_label(
+                data = top_upload_months,
+                aes(
+                        label = paste(polloi::compress(monthly_uploads, 0),
+                                      "in", format(month, "%b %Y")),
+                        hjust = "right", vjust = "top"
+                        ),
+                size = 3) +
+        scale_y_continuous("Uploads per month", labels = polloi::compress) +
+        scale_x_date("Date", date_breaks = "2 years", date_minor_breaks
+                     = "1 year", date_labels = "'%y") +
+        facet_wrap(~ extension, scales = "free_y") +
+        wmf::theme_facet(14) +
+        labs(
+                title = "Wikimedia Commons monthly file upload counts by file extension",
+                subtitle = "Does not include files that have been deleted as of 2018-02-11")
+
+p
+ggsave("figures/monthly_uploads_byfiletype.png", p, width = 18, height = 9, units = "in", dpi = 150)
+
+```
+
+### Proportions of file distribution on Wikimedia Commons by media and file type
+
+```{r}
+extension_by_media <- bind_rows(list(
+  "image" = data_frame(extension = c("jpg/jpeg", "png", "svg", "tif/tiff", "gif", "xcf", "webp")),
+  "audio" = data_frame(extension = c("flac", "mid", "wav", "ogg", "oga", "opus")),
+  "video" = data_frame(extension = c("ogv", "webm")),
+  "document" = data_frame(extension = c("pdf", "djvu"))
+), .id = "media")
+
+total_uploads %<>%
+        left_join(extension_by_media, by = "extension")
+```
+
+```{r}
+library(viridis)
+library(treemapify)
+
+p <- ggplot(
+        filter(total_uploads, extension != "jpg/jpeg"),
+        aes(area = uploads, fill = log10(uploads + 1), label =
+                    extension, subgroup = media)
+        ) +
+        geom_treemap(color = "black") +
+        geom_treemap_subgroup_border(color = "black") +
+        geom_treemap_text(color = "black", place = "topleft", grow =
+                                  FALSE, min.size = 0) +
+        geom_treemap_subgroup_text(
+                place = "center", grow = TRUE, alpha = 0.5, color =
+                        "black",
+                fontface = "italic", min.size = 0
+                ) +
+        scale_fill_viridis("Total files uploaded (on a logarithmic scale)", labels = function(x) {return(polloi::compress(10 ^ x))
+                }) +
+        guides(fill = guide_colorbar(barwidth = 20, barheight = 1))+ wmf::theme_min(14) +
+        labs(
+    title = "Proportion of cumulative files uploaded to Wikimedia Common by file and media type",
+    caption = "Note: Jpg/jpeg file extensions were omitted for visual clarity as they represent over ~38M of the files uploaded.",
+    subtitle = "These 16 extensions make up 5.7M files that have been uploaded and not deleted as of 2018-02-11"
+  )
+p
+ggsave("figures/treemap_uploads.png", p, width = 9, height = 9, units = "in", dpi = 150)
+```
+
+
+### Summary of total uploads by file type
+
+```{r}
+library(knitr)
+total_uploads %>%
+  select(media, extension, uploads) %>%
+  arrange(desc(uploads)) %>%
+  kable(format = "markdown")
+```
+
+

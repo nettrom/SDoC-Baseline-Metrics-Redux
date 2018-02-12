@@ -1,0 +1,157 @@
+---
+title: "File deletions by users on Wikimedia Commons (Redux)"
+author: "MNeisler"
+date: "2/7/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(0)
+library(tidyverse)
+```
+
+```{r}
+message("Create an auto-closing SSH tunnel in the background")
+system("ssh -f -o ExitOnForwardFailure=yes stat1006.eqiad.wmnet -L 3307:analytics-store.eqiad.wmnet:3306 sleep 10")
+library(RMySQL)
+con <- dbConnect(MySQL(), host = "127.0.0.1", group = "client", dbname = "commonswiki", port = 3307)
+```
+
+Epic Ticket: [T185363](https://phabricator.wikimedia.org/T185363)
+
+## File deletions by user on Wikimedia Commons (Redux)
+
+This report is a replicate of Mikhail's report in October 2017, reviewing file deletions on Wikimedia Commons. Questions reviewed in this report include: 
+
+1. Number of deleters (users who have deleted at least one file) over time
+2. How many files each user has deleted?
+
+Ticket: [T18675](https://phabricator.wikimedia.org/T186575)
+
+
+###  Number of deleters (users who have deleted at least one file) over time
+
+```{r}
+query <- "SELECT
+  fa_deleted_timestamp,
+  fa_deleted_user,
+  user_groups.ug_group
+FROM filearchive
+LEFT JOIN user_groups ON filearchive.fa_deleted_user = user_groups.ug_user;"
+```
+
+```{r}
+message("Using SSH tunnel & connection to Analytics-Store...")
+deleters <- wmf::mysql_read(query, "commonswiki", con)
+message("Closing connection...")
+wmf::mysql_close(con)
+save(deleters, file = "data/deleters.RData")
+```
+
+```{r}
+load("data/deleters.Rdata")
+library(magrittr)
+
+deleters %<>%
+  rename(
+    delete_date = fa_deleted_timestamp,
+    user_id = fa_deleted_user,
+    group = ug_group
+  ) %>%
+   mutate(
+    delete_date = ymd_hms(delete_date),
+    # Anonymize users
+    user = as.numeric(factor(as.character(user_id)))
+  ) %>%
+  select(-user_id) #Drop user ID
+```
+
+```{r}
+deletion_counts <- deleters %>%
+   mutate(date = as.Date(delete_date)) %>%
+   group_by(user, date) %>%
+   summarize(
+    deletions = n(),
+    groups = paste0(group, collapse = ", ")
+  )
+```
+
+
+```{r}
+#Count the number of users who've deleted at least one file.
+user_counts_cumulative <- deletion_counts %>%
+        group_by(user) %>% 
+        #first deletion date
+        summarize(first_deletion = min(date)) %>% 
+        arrange(first_deletion) %>% 
+        group_by(first_deletion) %>% 
+        summarise(new_users = n()) %>% 
+        mutate(cumulative_deleters = cumsum(new_users))
+
+tail(user_counts_cumulative)
+```
+
+
+### Cumulative Sum of Deleters on Wikimedia Commons
+```{r}
+library(ggplot2)
+p <- ggplot(user_counts_cumulative) +
+  geom_line(aes(x = first_deletion, y = cumulative_deleters)) +
+  scale_x_date("Date", date_breaks = "1 year", date_labels = "'%y") +
+  scale_y_continuous("Users", breaks = seq(0, 600, 100)) +
+  wmf::theme_min(14, panel.grid.minor.x = element_blank()) +
+  labs(
+    title = "Total No. of Deleters on Wikimedia Commons",
+    subtitle = "Number of users who have deleted at least one file"
+  )
+ggsave("figures/cumulative_deleters.png", p, width = 6, height = 3, units = "in", dpi = 150)
+```
+
+### Deleters broken down by quantity intervals
+
+```{r}
+library(knitr)
+user_counts_byquantity <- deletion_counts %>%
+        group_by(user) %>%
+        summarize(deletions = sum(deletions))  %>%
+        #Divide range of deletions into intervals and convert to character
+        mutate(deletions = as.character(cut(
+                deletions,
+                breaks = c(0, 10, 50, 100, 500, 1e3, 5e3, 1e4, Inf))
+                )) %>%
+        group_by(deletions) %>%
+        #count the users in each interval
+        summarize(users = n()) %>%
+        mutate(deletions = factor(case_when(
+                deletions == "(0,10]" ~ "0-10",
+                deletions == "(10,50]" ~ "10-50",
+                deletions == "(50,100]" ~ "50-100",
+                deletions == "(100,500]" ~ "100-500",
+                deletions == "(500,1e+03]" ~ "500-1K",
+                deletions == "(1e+03,5e+03]" ~ "1K-5K",
+                deletions == "(5e+03,1e+04]" ~ "5K-10K",
+                deletions == "(1e+04,Inf]" ~ "10K+"), 
+                c("0-10", "10-50", "50-100", "100-500", "500-1K", "1K-5K", "5K-10K", "10K+"))) 
+        
+```
+
+```{r}
+p <- ggplot(user_counts_byquantity, aes(x = deletions, y = users)) +
+        geom_bar(stat = "identity") +
+        geom_text(aes(
+                label = sprintf("%.0f of users", users),
+                vjust = "bottom"
+                ), nudge_y = 5) +
+        wmf::theme_min(14) +
+        labs(
+                title = "File deletion activity on Wikimedia Commons",
+                subtitle = sprintf("%.0f users have collectively deleted %s files",
+                                   max(deletion_counts$user),
+                                   polloi::compress(sum(deletion_counts$deletions), 2)
+                                   ),
+                x = "Number of files each user has deleted",
+                y = "Users who have deleted this many files")
+ggsave("figures/deleter_activity.png", p, width = 12, height = 6, units = "in", dpi = 150)
+```
+

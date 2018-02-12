@@ -1,0 +1,212 @@
+---
+title: "File deletion times on Wikimedia Commons (Redux)"
+author: "MNeisler"
+date: "2/9/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(0)
+library(tidyverse)
+```
+
+```{r}
+message("Create an auto-closing SSH tunnel in the background")
+system("ssh -f -o ExitOnForwardFailure=yes stat1006.eqiad.wmnet -L 3307:analytics-store.eqiad.wmnet:3306 sleep 10")
+library(RMySQL)
+con <- dbConnect(MySQL(), host = "127.0.0.1", group = "client", dbname = "commonswiki", port = 3307)
+```
+
+Epic Ticket: [T185363](https://phabricator.wikimedia.org/T185363)
+
+## File deletions on Wikimedia Commons - Breakdown by Time (Redux)
+
+This report is a replicate of Mikhail's report in October 2017, reviewing the time to deletion for files uploaded on Wikimedia Commons. Questions reviewed included: 
+
+1. Time to deletion, broken up by file type and reason for deletion (copyright violation vs other)
+2. The proportion of files deleted within a month after uploaded. How does this deletion rate look like over time? 
+
+Ticket: [T18675](https://phabricator.wikimedia.org/T186575)
+
+
+```{r}
+query <- "SELECT 
+        fa_media_type AS media_type,
+(
+    INSTR(LOWER(CONVERT(fa_deleted_reason USING utf8)), 'copyvio') > 0
+    OR INSTR(LOWER(CONVERT(fa_deleted_reason USING utf8)), 'copyright') > 0
+    OR INSTR(LOWER(CONVERT(fa_deleted_reason USING utf8)), 'trademark') > 0
+    OR INSTR(LOWER(CONVERT(fa_deleted_reason USING utf8)), 'logo') > 0
+    OR INSTR(LOWER(CONVERT(fa_deleted_reason USING utf8)), 'fair use') > 0
+    OR INSTR(LOWER(CONVERT(fa_deleted_reason USING utf8)), 'dmca') > 0
+    OR INSTR(LOWER(CONVERT(fa_deleted_reason USING utf8)), 'non-free') > 0
+    OR INSTR(LOWER(CONVERT(fa_deleted_reason USING utf8)), 'not free') > 0
+  ) AS copyright_nonfree,
+        fa_timestamp AS upload_date, 
+        fa_deleted_timestamp AS delete_date
+FROM filearchive"
+```
+
+
+```{r}
+message("Using SSH tunnel & connection to Analytics-Store...")
+time_to_deletion <- wmf::mysql_read(query, "commonswiki", con = con)
+message("Closing connection...")
+wmf::mysql_close(con)
+save(time_to_deletion, file = "data/time_to_deletion.RData")
+```
+```{r}
+load("data/time_to_deletion.Rdata")
+#Convert date to y-m-d format
+library(magrittr)
+library(lubridate)
+time_to_deletion$reason <- if_else(time_to_deletion$copyright_nonfree == 1, "copyright, logo, or non-free", "other reason")
+time_to_deletion$copyright_nonfree <- NULL
+time_to_deletion$media_type %<>% tolower
+time_to_deletion$upload_date %<>% ymd_hms(tz = "UTC")
+time_to_deletion$delete_date %<>% ymd_hms(tz = "UTC")
+time_to_deletion$difference <- as.numeric(difftime(time_to_deletion$delete_date, time_to_deletion$upload_date, units = "secs"))
+
+
+time_to_deletion %<>%
+        filter(difference > 0 & !is.na(media_type)) 
+
+```
+```{r}
+head(time_to_deletion)
+```
+
+### Time to deletion, broken up by file type and reason for deletion (copyright violation vs other)
+```{r}
+#find median times
+median_times <- time_to_deletion %>%
+        group_by(reason) %>%
+        summarise(median_time = ceiling(median(difference))) %>%
+        spread(reason, median_time) %>%
+        unlist
+```
+
+```{r}
+library(ggplot2)
+logtime_breaks <- c(1, 60, 60*60, 60*60*24, 60*60*24*7, 60*60*24*28, 60*60*24*365, 60*60*24*365*10)
+logtime_labels <- function(breaks) {
+  lbls <- breaks %>%
+    round %>%
+    seconds_to_period() %>%
+    tolower %>%
+    gsub(" ", "", .) %>%
+    sub("(.*[a-z])0s$", "\\1", .) %>%
+    sub("(.*[a-z])0m$", "\\1", .) %>%
+    sub("(.*[a-z])0h$", "\\1", .) %>%
+    sub("(.*[a-z])0d$", "\\1", .)
+  lbls <- case_when(
+    lbls == "7d" ~ "1wk",
+    lbls == "28d" ~ "1mo",
+    lbls == "365d" ~ "1yr",
+    lbls == "3650d" ~ "10yrs",
+    TRUE ~ lbls
+  )
+  return(lbls)
+}
+scale_x_logtime <- function(...) {
+  scale_x_log10(..., breaks = logtime_breaks, labels = logtime_labels)
+}
+scale_y_logtime <- function(...) {
+  scale_y_log10(..., breaks = logtime_breaks, labels = logtime_labels)
+}
+
+```
+
+
+```{r}
+p <- ggplot(
+        filter(time_to_deletion, !media_type %in% c("unknown", "archive", "text")),
+        aes(x = difference, fill = reason)
+        ) +
+        geom_density(adjust = 1.5, alpha = 0.5) +
+        scale_x_logtime(name = "Time to deletion") +
+        facet_wrap(~ media_type, scales = "free_y") +
+        wmf::theme_facet(14) +
+  theme(
+          panel.grid.minor.x = element_blank(),
+          axis.text.y = element_blank(),
+          panel.grid.major.y = element_blank(),
+          panel.grid.minor.y = element_blank(),
+          axis.title.y = element_blank()
+          ) +
+        labs(
+                title = "Distribution of files' time to deletion by media type and reason for deletion",
+                subtitle = paste("The median time to deletion across all media types is", median_times["copyright, logo, or non-free"],
+                                 "for copyright-related reasons and", median_times["other reason"], "otherwise"))
+
+p 
+ggsave("figures/time-to-deletion.png", p, width = 18, height = 9, units = "in", dpi = 150)
+```
+
+```{r}
+head(time_to_deletion)
+```
+
+
+### Proportion of files deleted in a month
+
+```{r}
+monthly_deletions <- time_to_deletion %>%
+        mutate(upload_month = floor_date(upload_date, "month"),
+               delete_month = floor_date(delete_date, "month")) %>% 
+        filter(upload_month < "2018-02-01") %>%
+        group_by(upload_month, media_type) %>% 
+        mutate(delete_in_month = upload_month == delete_month) %>%
+        ungroup()
+
+head(monthly_deletions)
+
+```
+
+### Monthly deletions by file type
+
+```{r}
+monthly_deletions$upload_month <- as.Date(monthly_deletions$upload_month)
+
+p <- ggplot(monthly_deletions, 
+        aes(x = upload_month, fill= delete_in_month)) +
+        geom_density(adjust = 1.5, alpha = 0.5) +
+        scale_x_date("Date", date_breaks = "2 years", date_minor_breaks = "1 year", date_labels = "'%y") +
+        scale_y_continuous() +
+        wmf::theme_facet(14) +
+        scale_fill_discrete(name="Deleted within 1 month of upload",
+                         breaks=c("FALSE", "TRUE"),
+                         labels=c("FALSE", "TRUE")) +
+        labs(
+                title = "Monthly deletions of newly uploaded files",
+                subtitle = "Includes only files deleted as of 2018-02-01."
+  )
+p
+ggsave("figures/monthly_uploads_deletions.png", p, width = 18, height = 9, units = "in", dpi = 150)
+
+```
+
+```{r}
+require(ggplot2)
+require(scales)
+
+p <- ggplot(filter(monthly_deletions, media_type != "bitmap"), 
+            aes(x=factor(1), fill=delete_in_month)) +
+        geom_bar(aes(y = (..count..)/sum(..count..)), width = 1) +
+        scale_y_continuous(labels=percent) +
+        facet_grid(facets=. ~ media_type) +
+        theme(
+         axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+        scale_fill_discrete(name = "Deleted within 1 month") +
+        labs(title = "Proportion of all deleted files (non-bitmap) on Wikimedia Commons by media type", 
+             x = "",
+             y = "Percent of Deleted Files",
+        subtitle = "Includes only files deleted as of 2018-02-01. Bitmap(image) files removed to help improve visual clarity")
+p
+ggsave("figures/Monthly_deletions_bymediatype.png", p, width = 18, height = 9, units = "in", dpi = 150)
+```
+
+
+
