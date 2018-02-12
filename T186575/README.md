@@ -5,11 +5,11 @@ This is a replicate of Mikhail's report from October 2017, [T177356](https://pha
 ## Questions Reviewed
 
 1. The distribution of file types and extensions. 
-2. Cumulative upload counts and newly uploads per month by file extension. 
-3. The proportion of files got deleted within a month after uploaded. How does this deletion rate look like over time?
-4. Number of deleters (users who have deleted at least one file) over time.
-5. How many files each user has deleted?
-6. Time to deletion, broken up by file type and reason for deletion (copyright violation vs other)
+2. Cumulative upload counts and new upload counts per month by file extension. 
+3. Number of deleters (users who have deleted at least one file) over time.
+4. How many files each user has deleted?
+5. Time to deletion, broken up by file type and reason for deletion (copyright violation vs other)
+6. The proportion of files deleted within a month after uploaded. How does this deletion rate look like over time?
 
 ## Distribution of file types
 
