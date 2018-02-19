@@ -59,18 +59,29 @@ By the end of January 2018, a total of 604 users had deleted at least one file. 
 
 ## Time to deletion
 
+### Time to deletion, broken up by file type and reason for deletion (copyright violation vs. other).
+
 As indicated in the Oct 2017 report, most copyright-related deletions happen within 1 day of upload across almost all media types, with the exception of 'drawing' (SVGs) files where most deletions happen within 1 month to a year. A lot of audio files are deleted within 1 minute or 1 week of upload. Half of all deleted images and PDFs (office) were deleted within 1 month of upload for non-copyright reasons.
 
 ![](file_deletion_time/figures/time-to-deletion.png)
 
 
-I aslo reviewed the proportion of files deleted under month after uploaded. About 53% of all the deleted files were deleted within one month of the upload date. Most video, audio, and office type files are deleted within 1 month after they are uploaded. After 2012, more deleted files are deleted within 1 month of their upload date while before 2012 more deleted files were deleted after 1 month of their upload date. 
+### The proportion of files deleted within a month after uploaded. How does this deletion rate look like over time?
 
-![](file_deletion_time/figures/monthly_uploads_deletions.png)
-
-![](file_deletion_time/figures/Monthly_deletions_bymediatype.png)
+I aslo reviewed the proportion of files deleted within a month (28 days) after upload date, querying both the image and filearchive tables to obtain all uploads each month (both deleted and not deleted before 2018-02-01). The average proportion of all uploaded files per month deleted within 28 days after upload is below about 0.03% each month. The highest proportion of deletions (1.1%) within a month occurred in December 2013. Between January 2014 to January 2018, there has been a decrease in the  proportion of deletions within a month after upload.
 
 
 
+![](file_deletion_time/figures/monthly_deletions_alluploads.png)
+
+
+
+I previously looked at the proportion of uploaded files deleted within month for only files that were deleted before 2018-02-01, querying just the file archive table of the Commons database. Results from this analayis are shown below. With the exception of drawing type files, over 50% of deleted video, audio, and office type files are deleted within 1 month after they are uploaded. 
+
+Note: These plots only reflect files deleted before 2018-02-01 and is expected to change as additional files are deleted after 2018-02-01. For example, the proportion of files deleted within in a month is high for January 2018 because only 1 month has passed when this query was taken. This proportion of deleted files after 1 month for January 2018 is expected to increase in the future as more uploads from this month are deleted. 
+
+![](file_deletion_time/figures/monthly_deletions_bytype.png)
+
+![](file_deletion_time/figures/monthly_deletions_alldel.png)
 
 

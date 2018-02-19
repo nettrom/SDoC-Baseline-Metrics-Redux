@@ -24,11 +24,13 @@ Epic Ticket: [T185363](https://phabricator.wikimedia.org/T185363)
 
 This report is a replicate of Mikhail's report in October 2017, reviewing the time to deletion for files uploaded on Wikimedia Commons. Questions reviewed included: 
 
-1. Time to deletion, broken up by file type and reason for deletion (copyright violation vs other)
-2. The proportion of files deleted within a month after uploaded. How does this deletion rate look like over time? 
+1. Time to deletion, broken up by file type and reason for deletion (copyright violation vs. other).
+2. The proportion of files deleted within a month after uploaded. How does this deletion rate look like over time? I looked at both proportion of all uploaded files (both deleted and not deleted before 2018-02-01) and just uploaded files that were deleted before 2018-02-01.
 
 Ticket: [T18675](https://phabricator.wikimedia.org/T186575)
 
+
+### 1. Time to deletion, broken up by file type and reason for deletion (copyright violation vs. other).
 
 ```{r}
 query <- "SELECT 
@@ -73,11 +75,7 @@ time_to_deletion %<>%
         filter(difference > 0 & !is.na(media_type)) 
 
 ```
-```{r}
-head(time_to_deletion)
-```
 
-### Time to deletion, broken up by file type and reason for deletion (copyright violation vs other)
 ```{r}
 #find median times
 median_times <- time_to_deletion %>%
@@ -88,7 +86,6 @@ median_times <- time_to_deletion %>%
 ```
 
 ```{r}
-library(ggplot2)
 logtime_breaks <- c(1, 60, 60*60, 60*60*24, 60*60*24*7, 60*60*24*28, 60*60*24*365, 60*60*24*365*10)
 logtime_labels <- function(breaks) {
   lbls <- breaks %>%
@@ -120,6 +117,7 @@ scale_y_logtime <- function(...) {
 
 
 ```{r}
+library(ggplot2)
 p <- ggplot(
         filter(time_to_deletion, !media_type %in% c("unknown", "archive", "text")),
         aes(x = difference, fill = reason)
@@ -137,76 +135,184 @@ p <- ggplot(
           ) +
         labs(
                 title = "Distribution of files' time to deletion by media type and reason for deletion",
-                subtitle = paste("The median time to deletion across all media types is", median_times["copyright, logo, or non-free"],
+                subtitle = paste("The median time to deletion across all media types is", median_times["copyright, logo, or non-free"], "seconds",
                                  "for copyright-related reasons and", median_times["other reason"], "otherwise"))
 
 p 
 ggsave("figures/time-to-deletion.png", p, width = 18, height = 9, units = "in", dpi = 150)
 ```
 
-```{r}
-head(time_to_deletion)
-```
 
-
-### Proportion of files deleted in a month
+### 2. The proportion of files deleted within a month after uploaded. How does this deletion rate look like over time?
 
 ```{r}
+#Find all files deleted within a month (28 days after upload date)
 monthly_deletions <- time_to_deletion %>%
         mutate(upload_month = floor_date(upload_date, "month"),
                delete_month = floor_date(delete_date, "month")) %>% 
         filter(upload_month < "2018-02-01") %>%
         group_by(upload_month, media_type) %>% 
-        mutate(delete_in_month = upload_month == delete_month) %>%
-        ungroup()
+        mutate(delete_in_month = difference < 60*60*24*28) 
 
-head(monthly_deletions)
-
-```
-
-### Monthly deletions by file type
-
-```{r}
 monthly_deletions$upload_month <- as.Date(monthly_deletions$upload_month)
-
-p <- ggplot(monthly_deletions, 
-        aes(x = upload_month, fill= delete_in_month)) +
-        geom_density(adjust = 1.5, alpha = 0.5) +
-        scale_x_date("Date", date_breaks = "2 years", date_minor_breaks = "1 year", date_labels = "'%y") +
-        scale_y_continuous() +
-        wmf::theme_facet(14) +
-        scale_fill_discrete(name="Deleted within 1 month of upload",
-                         breaks=c("FALSE", "TRUE"),
-                         labels=c("FALSE", "TRUE")) +
-        labs(
-                title = "Monthly deletions of newly uploaded files",
-                subtitle = "Includes only files deleted as of 2018-02-01."
-  )
-p
-ggsave("figures/monthly_uploads_deletions.png", p, width = 18, height = 9, units = "in", dpi = 150)
-
+#Revise delete in month to factor and clarfiy TRUE and FALSE labels. 
+monthly_deletions$delete_in_month %<>% factor(c(TRUE, FALSE), c("Within 1 month of upload", "After 1 month since upload"))
 ```
 
 ```{r}
 require(ggplot2)
 require(scales)
 
-p <- ggplot(filter(monthly_deletions, media_type != "bitmap"), 
-            aes(x=factor(1), fill=delete_in_month)) +
-        geom_bar(aes(y = (..count..)/sum(..count..)), width = 1) +
-        scale_y_continuous(labels=percent) +
-        facet_grid(facets=. ~ media_type) +
-        theme(
-         axis.text.x=element_blank(),
-        axis.ticks.x=element_blank()) +
-        scale_fill_discrete(name = "Deleted within 1 month") +
-        labs(title = "Proportion of all deleted files (non-bitmap) on Wikimedia Commons by media type", 
-             x = "",
-             y = "Percent of Deleted Files",
-        subtitle = "Includes only files deleted as of 2018-02-01. Bitmap(image) files removed to help improve visual clarity")
+p <- monthly_deletions %>%
+  group_by(upload_month, delete_in_month) %>%
+  tally %>%
+        ggplot(aes(x=upload_month, y = n, fill = delete_in_month)) +
+        geom_area(position = "fill", color = "black") +
+        geom_hline(yintercept = 0.5, linetype = "dashed") +
+        scale_y_continuous(labels = scales::percent_format()) +
+        scale_x_date(date_labels = "%Y", date_breaks = "1 year", date_minor_breaks = "1 year")  +
+        wmf::theme_min() +
+        labs(
+                fill = "Deleted",
+                x= "Date",
+                y = "Proportion",
+                title = "Proportion of all uploaded files deleted within 1 month (28 days)",
+                subtitle = "Includes only files deleted as of 2018-02-01"
+  )
 p
-ggsave("figures/Monthly_deletions_bymediatype.png", p, width = 18, height = 9, units = "in", dpi = 150)
+ggsave("figures/monthly_deletions_alldel.png", p, width = 18, height = 9, units = "in", dpi = 150)
+
 ```
 
 
+```{r}
+require(ggplot2)
+require(scales)
+
+p <- filter(monthly_deletions, !media_type %in% c("unknown", "archive", "text")) %>% 
+        ggplot(aes(x=factor(1), fill=delete_in_month)) +
+        geom_bar(position = "fill") +
+        scale_y_continuous(labels=percent_format()) +
+        facet_wrap(~ media_type, scale = "free_y") +
+        labs(title = "Proportion of newly uploaded files deleted within 1 month by media type", 
+             fill = "Deleted",
+             x = "",
+             y = "Proportion of files deleted within 1 month ",
+        subtitle = "Includes only files deleted as of 2018-02-01"
+p
+ggsave("figures/monthly_deletions_bytype.png", p, width = 18, height = 9, units = "in", dpi = 150)
+```
+
+
+## Proportion of files deleted within a month of upload (Looking at all uploaded file each month [deleted and not deleted as of 2018-02-01])
+
+The above plots only account for files deleted before 2018-02-01. I also reviewed the proportion of all uploaded files each month both deleted and not deleted as of 2018-02-01. 
+
+```{r}
+all_uploads_result <- "SELECT 
+upload_date, COUNT(*) AS uploads
+FROM(
+SELECT
+DATE(LEFT(filearchive.`fa_timestamp`, 8)) AS upload_date
+FROM filearchive
+UNION ALL
+SELECT
+DATE(LEFT(image.`img_timestamp`, 8)) AS upload_date
+FROM image
+) AS dates
+GROUP BY upload_date;
+"
+```
+
+
+```{r}
+message("Using SSH tunnel & connection to Analytics-Store...")
+all_uploads <- wmf::mysql_read(all_uploads_result, "commonswiki", con = con)
+message("Closing connection...")
+wmf::mysql_close(con)
+save(all_uploads, file = "data/all_uploads.RData")
+```
+
+```{r}
+deleted_in_month_result <- "SELECT 
+DATE(LEFT(fa_timestamp, 8)) AS upload_date, Count(*) AS n_deleted_month
+FROM filearchive
+WHERE DATE(TIME_TO_SEC(fa_timestamp)) - DATE(TIME_TO_SEC(fa_deleted_timestamp)) <= 2419200
+GROUP BY DATE(LEFT(fa_timestamp, 8))
+"
+```
+
+
+```{r}
+message("Using SSH tunnel & connection to Analytics-Store...")
+deleted_in_month <- wmf::mysql_read(deleted_in_month_result, "commonswiki", con = con)
+message("Closing connection...")
+wmf::mysql_close(con)
+save(deleted_in_month, file = "data/deleted_in_month.RData")
+```
+
+```{r}
+load("data/all_uploads.Rdata")
+load("data/deleted_in_month.Rdata")
+monthly_deletions_all <- merge(all_uploads, deleted_in_month, by = "upload_date", all = TRUE)
+```
+
+
+```{r}
+library(lubridate)
+library(magrittr)
+monthly_deletions_all$upload_date %<>% ymd()
+#assign NAs to 0 as these are instances where no files uploaded were deleted within a month
+monthly_deletions_all$n_deleted_month[is.na(monthly_deletions_all$n_deleted_month)] <- 0
+tail(monthly_deletions_all)
+```
+
+```{r}
+monthly_deletions_alluploads <- monthly_deletions_all %>%
+        mutate(upload_month = floor_date(upload_date, "month")) %>%
+        group_by(upload_month)  %>%
+        summarise(uploads = sum(uploads),
+                  n_deleted_month = sum(n_deleted_month)) %>%
+        ungroup() %>%
+        mutate(prop_deleted = n_deleted_month/uploads) %>%
+        arrange(upload_month, uploads, n_deleted_month)
+
+tail(monthly_deletions_alluploads)
+```
+```{r}
+max_prop <- monthly_deletions_alluploads  %>% 
+        top_n(4, prop_deleted)
+
+max_prop
+
+```
+
+```{r}
+p <- ggplot(filter(monthly_deletions_alluploads, upload_month < "2018-02-01"),
+            aes(x = upload_month, y = prop_deleted)) +
+        geom_line() +
+        geom_point(data = max_prop) +
+        geom_label(
+                data = max_prop,
+                aes(
+                        label = paste0(round(prop_deleted, 4) * 100, "%"), hjust = "right", vjust = "top"
+                ),
+                size = 3
+) + 
+        geom_hline(aes(yintercept = median(prop_deleted)), linetype = "dashed") +
+        scale_y_continuous(labels = scales::percent_format()) +
+        scale_x_date(date_labels = "%Y", date_breaks = "1 year", date_minor_breaks = "1 year")  +
+        wmf::theme_min() +
+        labs(
+                x= "Date of upload",
+                y = "Proportion deleted within 1 month",
+                title = "Proportion of all uploaded files deleted within 1 month (28 days)",
+                subtitle = "Includes all uploaded files both deleted and not deleted as of 2018-02-01"
+  )
+p
+ggsave("figures/monthly_deletions_alluploads.png", p, width = 18, height = 9, units = "in", dpi = 150)
+```
+```{r}
+(mean(monthly_deletions_alluploads$prop_deleted))*100
+```
 
