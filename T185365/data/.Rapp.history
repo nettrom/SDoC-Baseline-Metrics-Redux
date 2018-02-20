@@ -1,2 +1,0 @@
-load("/Users/mneisler/Code/SDoC-Baseline-Metrics-Redux/T185365/data/bot_by_mediatype.RData")
-head(bot_by_mediatype)
