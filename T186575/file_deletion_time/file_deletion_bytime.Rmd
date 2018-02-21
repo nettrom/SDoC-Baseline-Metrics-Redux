@@ -176,7 +176,7 @@ p <- monthly_deletions %>%
                 fill = "Deleted",
                 x= "Date",
                 y = "Proportion",
-                title = "Proportion of all uploaded files deleted within 1 month (28 days)",
+                title = "Proportion of all deleted files deleted within 1 month (28 days)",
                 subtitle = "Includes only files deleted as of 2018-02-01"
   )
 p
@@ -186,25 +186,25 @@ ggsave("figures/monthly_deletions_alldel.png", p, width = 18, height = 9, units 
 
 
 ```{r}
-require(ggplot2)
-require(scales)
-
 p <- filter(monthly_deletions, !media_type %in% c("unknown", "archive", "text")) %>% 
         ggplot(aes(x=factor(1), fill=delete_in_month)) +
         geom_bar(position = "fill") +
         scale_y_continuous(labels=percent_format()) +
         facet_wrap(~ media_type, scale = "free_y") +
-        labs(title = "Proportion of newly uploaded files deleted within 1 month by media type", 
+        labs(title = "Proportion of deleted files deleted within 1 month (28 days) by media type", 
              fill = "Deleted",
-             x = "",
-             y = "Proportion of files deleted within 1 month ",
-        subtitle = "Includes only files deleted as of 2018-02-01"
+             x = NULL,
+             y = "Proportion of deleted files deleted within 1 month ",
+        subtitle = "Includes only files deleted as of 2018-02-01")
+        
 p
 ggsave("figures/monthly_deletions_bytype.png", p, width = 18, height = 9, units = "in", dpi = 150)
 ```
 
 
-## Proportion of files deleted within a month of upload (Looking at all uploaded file each month [deleted and not deleted as of 2018-02-01])
+
+
+## Proportion of newly uploaded files deleted within a month of upload (Looking at all uploaded file each month [deleted and not deleted as of 2018-02-01])
 
 The above plots only account for files deleted before 2018-02-01. I also reviewed the proportion of all uploaded files each month both deleted and not deleted as of 2018-02-01. 
 
@@ -237,7 +237,7 @@ save(all_uploads, file = "data/all_uploads.RData")
 deleted_in_month_result <- "SELECT 
 DATE(LEFT(fa_timestamp, 8)) AS upload_date, Count(*) AS n_deleted_month
 FROM filearchive
-WHERE DATE(TIME_TO_SEC(fa_timestamp)) - DATE(TIME_TO_SEC(fa_deleted_timestamp)) <= 2419200
+WHERE TIME_TO_SEC(fa_timestamp) - TIME_TO_SEC(fa_deleted_timestamp) <= 2419200
 GROUP BY DATE(LEFT(fa_timestamp, 8))
 "
 ```
@@ -264,11 +264,12 @@ library(magrittr)
 monthly_deletions_all$upload_date %<>% ymd()
 #assign NAs to 0 as these are instances where no files uploaded were deleted within a month
 monthly_deletions_all$n_deleted_month[is.na(monthly_deletions_all$n_deleted_month)] <- 0
-tail(monthly_deletions_all)
+monthly_deletions_all$uploads[is.na(monthly_deletions_all$uploads)] <- 0
 ```
 
 ```{r}
 monthly_deletions_alluploads <- monthly_deletions_all %>%
+        filter(upload_date < "2018-02-01") %>%
         mutate(upload_month = floor_date(upload_date, "month")) %>%
         group_by(upload_month)  %>%
         summarise(uploads = sum(uploads),
@@ -276,10 +277,11 @@ monthly_deletions_alluploads <- monthly_deletions_all %>%
         ungroup() %>%
         mutate(prop_deleted = n_deleted_month/uploads) %>%
         arrange(upload_month, uploads, n_deleted_month)
-
-tail(monthly_deletions_alluploads)
 ```
+
+
 ```{r}
+#Determine the months with the highest number of uploaded files deleted within a month.
 max_prop <- monthly_deletions_alluploads  %>% 
         top_n(4, prop_deleted)
 
@@ -288,7 +290,7 @@ max_prop
 ```
 
 ```{r}
-p <- ggplot(filter(monthly_deletions_alluploads, upload_month < "2018-02-01"),
+p <- ggplot(monthly_deletions_alluploads,
             aes(x = upload_month, y = prop_deleted)) +
         geom_line() +
         geom_point(data = max_prop) +
@@ -307,12 +309,20 @@ p <- ggplot(filter(monthly_deletions_alluploads, upload_month < "2018-02-01"),
                 x= "Date of upload",
                 y = "Proportion deleted within 1 month",
                 title = "Proportion of all uploaded files deleted within 1 month (28 days)",
-                subtitle = "Includes all uploaded files both deleted and not deleted as of 2018-02-01"
+                subtitle = "Includes all uploaded files both deleted and not deleted as of 2018-02-01",
+                caption = "The dashed line marks the median proportion of files deleted within 1 month"
   )
 p
 ggsave("figures/monthly_deletions_alluploads.png", p, width = 18, height = 9, units = "in", dpi = 150)
 ```
+
+
+
+
 ```{r}
-(mean(monthly_deletions_alluploads$prop_deleted))*100
+mean(monthly_deletions_alluploads$prop_deleted)
 ```
+
+
+
 

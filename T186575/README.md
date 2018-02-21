@@ -68,7 +68,7 @@ As indicated in the Oct 2017 report, most copyright-related deletions happen wit
 
 ### The proportion of files deleted within a month after uploaded. How does this deletion rate look like over time?
 
-I aslo reviewed the proportion of files deleted within a month (28 days) after upload date, querying both the image and file archive tables to obtain all uploads each month (both deleted and not deleted before 2018-02-01). The average proportion of all uploaded files per month deleted within 28 days after upload is about 0.03% each month. The highest proportion of deletions within a month occurred in December 2013 (1.1%). Between January 2014 to January 2018, there has been a decrease in the  proportion of deletions within a month after upload.
+I aslo reviewed the proportion of uploaded files deleted within a month (28 days) after upload date, querying both the image and file archive tables to obtain all uploads each month (both deleted and not deleted before 2018-02-01). An average of 13.3% of all uploaded files per month are deleted within 28 days after upload. The highest proportion of deletions within a month occurred in Novomber 2004 (41.38). From about 2013 to 2018, there has been an overall decrease in the proportion of deletions within a month after upload.
 
 
 
@@ -83,5 +83,9 @@ Note: These plots only reflect only files deleted before 2018-02-01 and the tren
 ![](file_deletion_time/figures/monthly_deletions_bytype.png)
 
 ![](file_deletion_time/figures/monthly_deletions_alldel.png)
+
+## Next Steps ##
+1. Calculate and plot the CI (confidence interval or credible interval) band of the line for plots of proportion of files deleted within a month (28 days)
+2. Might be interesting to review deletions broken down by bots vs users.
 
 
