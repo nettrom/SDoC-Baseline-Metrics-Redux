@@ -2,13 +2,13 @@
 
 Epic Ticket: [T185363](https://phabricator.wikimedia.org/T185363)
 
-##Overview##
+##Overview
 
 This is a replicate of Chelsy's anaysis from November 2017, [T177534](https://phabricator.wikimedia.org/T177534), computing desktop search metrics on Wikimedia Commons and comparing them to English Wikipedia to understand how well the search engine serve the users on Wikimedia Commons.  
 
 I computed several search metrics with event logging data (TestSearchSatisfaction2 table) from February 2018. Metrics were compared to English Wikipedia desktop searches as there are less than 100 search results daily on mobile web on Commons. Results are similar to those found in November 2017 with some notable changes in rates. For example, there was a decline in the full-text search clickthrough rate on Commons from 10.42% in November 2017 to 3.17% in February 2018. 
 
-##Objectives##
+##Objectives
 
 1. Compare the desktop full-text search zero result rate on Commons vs English Wikipedia. Break down the number by day.
 2. Compare the desktop full-text search clickthrough rate on Commons vs English Wikipedia. Break down the number by day.
@@ -17,8 +17,6 @@ I computed several search metrics with event logging data (TestSearchSatisfactio
 5. Compare the desktop autocomplete search clickthrough rate on Commons vs English Wikipedia. Break down the number by day.
 
 Ticket: [T18675](https://phabricator.wikimedia.org/T187827)
-
-Note:  I did not look at the scroll on SERPS as that may not be a useful metric on how well users interact with the search engine.
 
 ## Desktop full-text search zero result rate (zrr) 
 
