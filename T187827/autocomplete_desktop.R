@@ -78,9 +78,10 @@ ggsave("autocomplete_all_ctr.png", p, path = fig_path, units = "in", dpi = plot_
 
 
 
-#Plot daily clickthrough rate
+#Plot daily clickthrough rate for autocomplete events
 
 p <- autocomplete_events %>%
+        filter(date < "20180216") %>% #remove data from last day because we don't have all the data for that day.
         mutate(date = lubridate::ymd(date)) %>%
         group_by(date, wiki, action) %>%
         summarise(n_events = n()) %>%
@@ -96,7 +97,7 @@ p <- autocomplete_events %>%
         scale_color_brewer("Wiki", palette = "Set1") +
         scale_fill_brewer("Wiki", palette = "Set1") +
         scale_y_continuous("Clickthrough Rate", labels = scales::percent_format()) +
-        labs(title = "Daily autocomplete search clickthrough rates on desktop", subtitle = "Dashed line marks the average clickthrough rate",
+        labs(title = "Daily autocomplete search clickthrough rates on desktop", subtitle = "Dashed line marks the overall clickthrough rate",
              caption = "*clickthrough rates = total clicks / total search result pages.") +
         wmf::theme_min()
 ggsave("daily_autocomplete_ctr.png", p, path = fig_path, units = "in", dpi = plot_resolution, height = 6, width = 10, limitsize = FALSE)

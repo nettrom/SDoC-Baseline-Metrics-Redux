@@ -43,16 +43,16 @@ As also found in November 2017, users on Commons are much more likely to click t
 
 ## Dwell time on articles after users clickthrough
 
-I also reviewed the users dwell time (the time the user has spent on a page) on articles after users clickthrough past the search results page. Overall users on Commons spend a shorter time on articles after clickthrough compared to English Wikipedia. A higher proportion of Commons articles have a user dwell time rate of under 10 seconds. 
+I also reviewed the users dwell time (the time the user has spent on a page) after users clickthrough past the search results page. Overall users on Commons spend a shorter time on pages after clickthrough compared to English Wikipedia. Visitors are more likely to leave the page within 10 seconds on Commons. 
 
-However, this may not be indicative of how well the search engine is serving users and more indicative of they type of content found on the sites. Commons articles can usually be viewed in a quicker timespan than English Wikipedia articles.  
+However, this may not be indicative of how well the search engine is serving users and more indicative of they type of content found on the sites. Commons pages can usually be viewed in a quicker timespan than English Wikipedia articles.  
 ![](figures/survival_visitedPages_all.png)
 
 ![](figures/dwell_time_bycheckin.png)
 
 ## Desktop autocomplete search clickthrough rate
 
-Similar to full-text searches, Commons has lower rate of clickthrough rates for autocompleted searches compared on English Wikipedia on desktop; however, the difference is not as significant as it was for full-text searches. 
+Similar to full-text searches, Commons has lower rate of clickthrough for autocompleted searches compared to English Wikipedia on desktop; however, the difference is not as significant as it was for full-text searches. 
 
 In February 2018, there was a higher clickthrough rate for autocomplete searches (18.40%) compared to full-text searches (3.17%) on Commons. There was a reverse trend for English Wikipedia searches, which had a lower clickthrough rate for autocomplete searches (19.08%) compared to full-text searches (35.74%). 
 

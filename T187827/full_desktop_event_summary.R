@@ -38,7 +38,7 @@ p <- searches %>%
         scale_color_brewer("Wiki", palette = "Set1") +
         scale_fill_brewer("Wiki", palette = "Set1") +
         scale_y_continuous("Zero results rate", labels = scales::percent_format()) +
-        labs(title = "Daily full-text search-wise zero results rate on desktop", subtitle = "Dashed line marks the average zero results rate") +
+        labs(title = "Daily full-text search-wise zero results rate on desktop", subtitle = "Dashed line marks the overall zero results rate") +
         wmf::theme_min()
 ggsave("daily_zrr.png", p, path = fig_path, units = "in", dpi = plot_resolution, height = 6, width = 10, limitsize = FALSE)
 rm(p)
@@ -83,7 +83,7 @@ p <- searches %>%
         scale_color_brewer("Wiki", palette = "Set1") +
         scale_fill_brewer("Wiki", palette = "Set1") +
         scale_y_continuous("Clickthrough rate", labels = scales::percent_format()) +
-        labs(title = "Daily search-wise full-text clickthrough rates on desktop", subtitle = "Dashed line marks the average clickthrough rate") +
+        labs(title = "Daily search-wise full-text clickthrough rates on desktop", subtitle = "Dashed line marks the overall clickthrough rate") +
         wmf::theme_min()
 ggsave("daily_ctr.png", p, path = fig_path, units = "in", dpi = plot_resolution, height = 6, width = 10, limitsize = FALSE)
 rm(p)
@@ -139,7 +139,6 @@ rm(p)
 
 
 #4. Compare the dwell time on articles after users clickthrough on Commons vs English Wikipedia.
-install.packages("survminer")
 temp <- visitedPages
 #Create survival object
 temp$SurvObj <- with(temp, survival::Surv(dwell_time, status == 2))
@@ -182,23 +181,23 @@ dwell_time_bycheckin <- visitedPages %>%
         ) 
      
    
-checkin_names <- c(
-        `0` = "0s",
-        `10` = "10s",
-        `20` = "20s",
-        `30` = "30s",
-        `40` = "40s",
-        `50` = "50s",
-        `60` = "60s",
-        `90` = "90s",
-        `120` = "120s",
-        `150` = "150s",
-        `180` = "180s",
-        `210` = "210s",
-        `240` = "240s",
-        `300` = "300s",
-        `360` = "360s",
-        `420` = "420s"
+checkin_intervals <- c(
+        `0` = "0-10s",
+        `10` = "10-20s",
+        `20` = "20-30s",
+        `30` = "30-40s",
+        `40` = "40-50s",
+        `50` = "50-60s",
+        `60` = "60-70s",
+        `90` = "70-80s",
+        `120` = "80-120s",
+        `150` = "120-150s",
+        `180` = "150-180s",
+        `210` = "180-210s",
+        `240` = "210-240s",
+        `300` = "240-300s",
+        `360` = "300-360s",
+        `420` = "360-420s"
 )
 
 p <- dwell_time_bycheckin %>%
@@ -206,8 +205,9 @@ p <- dwell_time_bycheckin %>%
         geom_linerange() +
         geom_label(aes(label = sprintf("%.2f%%", 100 * mean)), show.legend = FALSE) +
         scale_y_continuous(labels = scales::percent_format()) +
-        facet_wrap(~ dwell_time, scale = "free_y", labeller =  as_labeller(checkin_names))+
+        facet_wrap(~ dwell_time, scale = "free_y", labeller =  as_labeller(checkin_intervals))+
         scale_color_brewer("Wiki", palette = "Set1") +
+        theme(legend.position="bottom")  +
         labs(
                 title = "Dwell time on articles after users clickthrough (broken down by check-in time) ",
                 y = "Proportion of visits")
