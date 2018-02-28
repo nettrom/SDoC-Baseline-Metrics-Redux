@@ -13,7 +13,7 @@ I computed several search metrics with event logging data (TestSearchSatisfactio
 1. Compare the desktop full-text search zero result rate on Commons vs English Wikipedia. Break down the number by day.
 2. Compare the desktop full-text search clickthrough rate on Commons vs English Wikipedia. Break down the number by day.
 3. Compare the proportion of desktop full-text searches with clicks to see other pages of the search results on Commons vs English Wikipedia. Break down the number by day.
-4. Compare the dwell time on articles after users clickthrough on Commons vs English Wikipedia.
+4. Compare the dwell time on pages after users clickthrough on Commons vs English Wikipedia.
 5. Compare the desktop autocomplete search clickthrough rate on Commons vs English Wikipedia. Break down the number by day.
 
 Ticket: [T18675](https://phabricator.wikimedia.org/T187827)
@@ -41,11 +41,11 @@ As also found in November 2017, users on Commons are much more likely to click t
 
 ![](figures/daily_serp_offset.png)
 
-## Dwell time on articles after users clickthrough
+## Dwell time on pages after users clickthrough
 
 I also reviewed the users dwell time (the time the user has spent on a page) after users clickthrough past the search results page. Overall users on Commons spend a shorter time on pages after clickthrough compared to English Wikipedia. Visitors are more likely to leave the page within 10 seconds on Commons. 
 
-However, this may not be indicative of how well the search engine is serving users and more indicative of they type of content found on the sites. Commons pages can usually be viewed in a quicker timespan than English Wikipedia articles.  
+However, this may not be indicative of how well the search engine is serving users and more indicative of they type of content found on the sites. Commons pages can usually be viewed in a quicker timespan than English Wikipedia pages.  
 ![](figures/survival_visitedPages_all.png)
 
 ![](figures/dwell_time_bycheckin.png)

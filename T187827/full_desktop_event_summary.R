@@ -25,6 +25,7 @@ rm(p)
 #Breakdown by day
 
 p <- searches %>%
+        filter(date < "2018-02-22") %>% #remove data from last day due to incomplete data on that day.
         group_by(date, wiki) %>%
         summarize(n_search = n(), zero = sum(!`got same-wiki results`)) %>%
         ungroup %>%
@@ -69,6 +70,7 @@ rm(p)
 #Clickthrough rate broken down by day
 
 p <- searches %>%
+        filter(date < "2018-02-22") %>% #remove data from last day due to incomplete data on that day.
         keep_where(`got same-wiki results` == TRUE) %>%
         group_by(wiki, date) %>%
         summarize(n_search = n(), clickthroughs = sum(`same-wiki clickthrough`)) %>%
@@ -119,6 +121,7 @@ p <- serp_offset %>%
         group_by(session_id, search_id) %>%
         summarize(`Any page-turning` = any(offset > 0)) %>%
         dplyr::right_join(searches, by = c("session_id", "search_id")) %>%
+        filter(date < "2018-02-22") %>% #remove data from last day due to incomplete data on that day.
         group_by(date, wiki) %>%
         summarize(page_turn = sum(`Any page-turning`, na.rm = TRUE), n_search = n()) %>%
         ungroup %>%

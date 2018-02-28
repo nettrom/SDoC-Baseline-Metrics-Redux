@@ -81,7 +81,7 @@ ggsave("autocomplete_all_ctr.png", p, path = fig_path, units = "in", dpi = plot_
 #Plot daily clickthrough rate for autocomplete events
 
 p <- autocomplete_events %>%
-        filter(date < "20180216") %>% #remove data from last day because we don't have all the data for that day.
+        filter(date < "20180222") %>% #remove data from last day due to incomplete data on that day.
         mutate(date = lubridate::ymd(date)) %>%
         group_by(date, wiki, action) %>%
         summarise(n_events = n()) %>%
