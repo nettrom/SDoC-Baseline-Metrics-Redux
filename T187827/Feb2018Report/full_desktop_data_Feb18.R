@@ -13,6 +13,7 @@ SELECT
         event_pageViewId AS page_id,
         event_articleId AS article_id,
         event_searchSessionId AS session_id,
+        MD5(LOWER(TRIM(event_query))) AS query_hash,
         event_action AS event,
         CASE
         WHEN event_position < 0 THEN NULL
