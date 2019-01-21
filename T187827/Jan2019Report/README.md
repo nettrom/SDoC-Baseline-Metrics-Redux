@@ -15,7 +15,7 @@ We computed several desktop search metrics on Wikimedia Commons with event loggi
 
 Results show an increase in the full-text search clickthrough rate on Commons from 3.17% in February 2018 (pre-bux fix) to 22.89% in data reviewed between October 2018 to January 2019 (post-bug fix). There was a slight decrease in the zero results rate from 7.05% to 6%. The proportion of searches with clicks to other search result pages stayed roughly the same with only a very slight increase from 13.2% to 13.48%.
 
-## Comparison of February 2019 and January 2019 Search Metrics on Wikimedia Commons
+## Comparison of February 2018 and January 2019 Search Metrics on Wikimedia Commons
 
 | Search metric | February 2018 (pre-bux fix) | January 2019 (post-bug fix)|
 | ------------- |:-------------:| -----:|
